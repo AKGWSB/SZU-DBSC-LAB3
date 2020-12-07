@@ -1,0 +1,78 @@
+use lab3;
+drop procedure if exists add_purchase;
+
+delimiter //
+create procedure add_purchase(
+    in c_id int,
+    in e_id int,
+    in p_id int,
+    in pur_qty int
+)
+add_purchase:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 旧存货量, 阈值
+    declare old_qoh, threshold int;
+
+    # 验证 cid 是否存在
+    select count(cid) from customers where cid=c_id limit 1 into res;
+    if res<1 then
+        set msg = "customer not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 eid 是否存在
+    select count(eid) from employees where eid=e_id limit 1 into res;
+    if res<1 then
+        set msg = "employee not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 pid 是否存在
+    select count(pid) from products where pid=p_id limit 1 into res;
+    if res<1 then
+        set msg = "product not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 pur_qty 是否超出 qoh
+    select qoh from products where pid=p_id into res;
+    if res<pur_qty then
+        set msg = "purchase quantity out of limit!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 记录旧数量, 获取存货阈值
+    select qoh, qoh_threshold from products where pid=p_id into old_qoh, threshold;
+
+    # 减少商品存量
+    update products set qoh=qoh-pur_qty where pid=p_id;
+
+    # 如果购买后数量低于阈值则补货: 这里令 qoh = old_qoh - pur_qty
+    if (old_qoh-pur_qty)<threshold then
+        update products set qoh=old_qoh*2 where pid=p_id;
+    end if;
+
+    # 修改顾客信息
+    update customers set visits_made=visits_made+1, last_visit_time=now() where cid=c_id;
+    
+    # 获取总价格
+    select original_price*discnt_rate from products where pid=p_id into res;
+    set res = res*pur_qty;
+
+    # 增加记录到 purchases 表
+    insert into purchases (cid, eid, pid, qty, ptime, total_price) values (c_id, e_id, p_id, pur_qty, now(), res);
+
+    # 返回成功
+    set st = 1;
+    set msg = "add purchase success!";
+    select st, msg;
+end//
+delimiter ;

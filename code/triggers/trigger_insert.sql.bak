@@ -1,0 +1,54 @@
+use lab3;
+drop trigger if exists triger_insert_customers;
+drop trigger if exists triger_insert_employees;
+drop trigger if exists triger_insert_products;
+drop trigger if exists triger_insert_purchases;
+drop trigger if exists triger_insert_suppliers;
+delimiter //
+
+# 为 customers 表注册 insert 触发器
+create trigger triger_insert_customers
+after insert on customers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "customers", "insert", NEW.cid);
+end//
+
+# 为 employees 表注册 insert 触发器
+create trigger triger_insert_employees
+after insert on employees for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "employees", "insert", NEW.eid);
+end//
+
+# 为 products 表注册 insert 触发器
+create trigger triger_insert_products
+after insert on products for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "products", "insert", NEW.pid);
+end//
+
+# 为 purchases 表注册 insert 触发器
+create trigger triger_insert_purchases
+after insert on purchases for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "purchases", "insert", NEW.pur);
+end//
+
+# 为 suppliers 表注册 insert 触发器
+create trigger triger_insert_suppliers
+after insert on suppliers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "suppliers", "insert", NEW.sid);
+end//
+
+delimiter ;

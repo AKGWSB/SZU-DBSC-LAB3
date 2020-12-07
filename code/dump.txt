@@ -1,0 +1,1104 @@
+# change all eid, cid, pid, pur, key_value to int types in the future
+drop database if exists lab3;
+create database if not exists lab3;
+use lab3;
+
+create table employees (
+    eid int not null, 
+    ename varchar(15),
+    city varchar(15),
+    primary key(eid)
+);
+
+create table customers (
+    cid int not null,
+    cname varchar(15),
+    city varchar(15),
+    visits_made int,
+    last_visit_time datetime,
+    primary key(cid)
+);
+
+create table suppliers (
+    sid int not null,
+    sname varchar(15) not null,
+    city varchar(15),
+    telephone_no char(11),
+    primary key(sid),
+    unique(sname)
+);
+
+create table products (
+    pid int not null,
+    pname varchar(15) not null,
+    qoh int not null,
+    qoh_threshold int,
+    original_price decimal(6,2),
+    discnt_rate decimal(3,2),
+    sid int,
+    primary key(pid),
+    foreign key (sid) references suppliers (sid)
+);
+
+create table purchases (
+    pur int not null auto_increment,
+    cid int not null,
+    eid int not null,
+    pid int not null,
+    qty int,
+    ptime datetime,
+    total_price decimal(7,2),
+    primary key (pur),
+    foreign key (cid) references customers(cid),
+    foreign key (eid) references employees(eid),
+    foreign key (pid) references products(pid)
+);
+
+create table logs (
+    logid int not null auto_increment,
+    who varchar(10) not null,
+    time datetime not null,
+    table_name varchar(20) not null,
+    operation varchar(6) not null,
+    key_value int,
+    primary key (logid)
+); 
+
+use lab3;
+
+# ---- insert into employees:
+insert into `employees`
+(`eid`, `ename`, `city`)
+values
+(90071, "bobWang", "GuangZhou"),
+(90072, "samZhang", "ShangHai"),
+(90073, "ZeMinJiang", "ShangHai"),
+(90074, "DaSiMa", "WuHu"),
+(90075, "MalaTang", "ChengDu");
+
+# ---- insert into customers:
+insert into `customers`
+(`cid`, `cname`, `city`, `visits_made`, `last_visit_time`)
+values
+(114, "ShiYouLao", "HengYang", 3, "2020-12-2 16:03"),
+(514, "SCWang", "MaoMing", 2, "2020-12-1 12:12"),
+(191, "GaoKuaiDian", "BeiJin", 5, "2020-11-29 06:19"),
+(981, "TuanTuan", "NewYork", 9, "2020-12-6 22:59");
+
+# ---- insert into suppliers:
+insert into `suppliers`
+(`sid`, `sname`, `city`, `telephone_no`)
+values
+(8081, "HuaWei", "DongGuan", "13670778081"),
+(4396, "XiaoMi", "ShangHai", "15343214396"),
+(7777, "Apple", "BeiJIn", "18922007777");
+
+# ---- insert into products:
+insert into `products`
+(`pid`, `pname`, `qoh`, `qoh_threshold`, `original_price`, `discnt_rate`, `sid`)
+values
+(3306, "mate40", 2147, 999, 778.00, 0.95, 8081),
+(3307, "mate40pro", 364, 19, 556.00, 0.95, 8081),
+(7158, "RedMi", 100, 50, 220.00, 0.85, 4396),
+(7159, "SE-8", 100, 99, 440.00, 0.75, 4396),
+(443, "iphoneX", 110, 23, 987.00, 1.00, 7777),
+(444, "iphone12", 67, 28, 998.00, 1.00, 7777);
+
+use lab3;
+drop procedure if exists delete_customer;
+
+delimiter //
+create procedure delete_customer(in _cid int)
+delete_customer:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 cid 相同的记录
+    select count(cid) from customers where cid=_cid limit 1 into res;
+    if res<1 then
+        set msg = "target customer not exists!";
+        select st, msg;
+        leave delete_customer;
+    end if;
+
+    # 检查 cid 是否存在外键约束
+    select count(customers.cid) from customers, purchases
+    where customers.cid=_cid and customers.cid=purchases.cid
+    limit 1 into res;
+    if res>0 then
+        set msg = "exists foreign key <cid> limit";
+        select st, msg;
+        leave delete_customer;
+    end if;
+
+    # 执行删除语句
+    delete from customers where cid=_cid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete customer success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists delete_employee;
+
+delimiter //
+create procedure delete_employee(in _eid int)
+delete_employee:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 eid 相同的记录
+    select count(eid) from employees where eid=_eid limit 1 into res;
+    if res<1 then
+        set msg = "target employee not exists!";
+        select st, msg;
+        leave delete_employee;
+    end if;
+
+    # 检查是否存在外键约束
+    select count(employees.eid) from employees, purchases
+    where employees.eid=_eid and employees.eid=purchases.eid
+    limit 1 into res;
+    if res>0 then
+        set msg = "exists foreign key <eid> limit";
+        select st, msg;
+        leave delete_employee;
+    end if;
+
+    # 执行删除语句
+    delete from employees where eid=_eid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete employee success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists delete_log;
+
+delimiter //
+create procedure delete_log(in _logid int)
+delete_log:
+begin
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在记录
+    select count(logid) from logs where logid=_logid limit 1 into res;
+    if res<1 then
+        set msg = "target log not exists!";
+        select st, msg;
+        leave delete_log;
+    end if;
+
+    # 执行删除语句
+    delete from logs where logid=_logid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete log success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists delete_product;
+
+delimiter //
+create procedure delete_product(in _pid int)
+delete_product:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在 pid 相同的记录
+    select count(pid) from products where pid=_pid limit 1 into res;
+    if res<1 then
+        set msg = "target product not exists!";
+        select st, msg;
+        leave delete_product;
+    end if;
+
+    # 检查外键约束 购买记录 purchases 如果有依赖则不能删除
+    select count(products.pid) from products, purchases 
+    where products.pid=_pid and products.pid=purchases.pid
+    limit 1 into res;
+    if res>0 then
+        set msg = "foreign key <pid> limit: a record exists in table <purchases>!";
+        select st, msg;
+        leave delete_product;
+    end if;
+
+    # 执行删除语句
+    delete from products where pid=_pid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete product success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists delete_purchase;
+
+delimiter //
+create procedure delete_purchase(in _pur int)
+delete_purchase:
+begin
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在记录
+    select count(pur) from purchases where pur=_pur limit 1 into res;
+    if res<1 then
+        set msg = "target purchase not exists!";
+        select st, msg;
+        leave delete_purchase;
+    end if;
+
+    # 执行删除语句
+    delete from purchases where pur=_pur;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete purchase success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists delete_supplier;
+
+delimiter //
+create procedure delete_supplier(in _sid int)
+delete_supplier:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 sid 相同的记录
+    select count(sid) from suppliers where sid=_sid limit 1 into res;
+    if res<1 then
+        set msg = "target supplier not exists!";
+        select st, msg;
+        leave delete_supplier;
+    end if;
+
+    # 检查外键约束
+    select count(suppliers.sid) from suppliers, products
+    where suppliers.sid=_sid and suppliers.sid=products.sid
+    limit 1 into res;
+    if res>0 then
+        set msg = "exists foreign key <sid> limit";
+        select st, msg;
+        leave delete_supplier;
+    end if;
+
+    # 执行删除语句
+    delete from suppliers where sid=_sid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "delete supplier success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_customer;
+
+delimiter //
+create procedure insert_customer(
+    in _cid int,
+    in _cname varchar(15),
+    in _city varchar(15),
+    in _visit_made int,
+    in _last_visit_time datetime
+)
+insert_customer:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 cid 相同的记录
+    select count(cid) from customers where cid=_cid limit 1 into res;
+    if res>0 then
+        set msg = "customer already exists!";
+        select st, msg;
+        leave insert_customer;
+    end if;
+
+    # 执行插入语句
+    insert into customers
+    (`cid`, `cname`, `city`, `visits_made`, `last_visit_time`)
+    values
+    (_cid, _cname, _city, _visit_made, _last_visit_time);
+
+    # 返回成功
+    set st = 1;
+    set msg = "insert customer success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_employee;
+
+delimiter //
+create procedure insert_employee(
+    in _eid int,
+    in _ename varchar(15),
+    in _city varchar(15)
+)
+insert_employee:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 eid 相同的记录
+    select count(eid) from employees where eid=_eid limit 1 into res;
+    if res>0 then
+        set msg = "employee already exists!";
+        select st, msg;
+        leave insert_employee;
+    end if;
+
+    # 执行插入语句
+    insert into employees
+    (`eid`, `ename`, `city`)
+    values
+    (_eid, _ename, _city);
+
+    # 返回成功
+    set st = 1;
+    set msg = "insert employee success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_log;
+
+delimiter //
+create procedure insert_log(
+    in _logid int,
+    in _who varchar(10),
+    in _time datetime,
+    in _table_name varchar(20),
+    in _operation varchar(6),
+    in _key_value int
+)
+insert_log:
+begin
+    # 不支持直接插入
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail: logs not support insert directly!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_product;
+
+delimiter //
+create procedure insert_product(
+    in _pid int,
+    in _pname varchar(15),
+    in _qoh int,
+    in _qoh_threshold int,
+    in _original_price decimal(6,2),
+    in _discnt_rate decimal(3,2),
+    in _sid int
+)
+insert_product:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在 pid 相同的记录
+    select count(pid) from products where pid=_pid limit 1 into res;
+    if res>0 then
+        set msg = "product already exists!";
+        select st, msg;
+        leave insert_product;
+    end if;
+
+    # 检查外键约束 没有对应的 supplier 则报错
+    select count(sid) from suppliers where sid=_sid limit 1 into res;
+    if res<1 then
+        set msg = "foreign key <sid> limit: record not exists in table <suppliers>!";
+        select st, msg;
+        leave insert_product;
+    end if;
+
+    # 执行插入语句
+    insert into `products`
+    (`pid`, `pname`, `qoh`, `qoh_threshold`, `original_price`, `discnt_rate`, `sid`)
+    values
+    (_pid, _pname, _qoh, _qoh_threshold, _original_price, _discnt_rate, _sid);
+
+    # 返回成功
+    set st = 1;
+    set msg = "insert product success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_purchase;
+
+delimiter //
+create procedure insert_purchase(
+    in _pur int,
+    in _cid int,
+    in _eid int,
+    in _pid int,
+    in _qty int,
+    in _ptime datetime,
+    in _total_price decimal(7,2)
+)
+insert_purchase:
+begin
+    # 不支持直接插入
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail: purchase not support insert directly!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists insert_supplier;
+
+delimiter //
+create procedure insert_supplier(
+    in _sid int,
+    in _sname varchar(15),
+    in _city varchar(15),
+    in _telephone_no char(10)
+)
+insert_supplier:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 eid 相同的记录
+    select count(sid) from suppliers where sid=_sid or sname=_sname limit 1 into res;
+    if res>0 then
+        set msg = "supplier already exists!";
+        select st, msg;
+        leave insert_supplier;
+    end if;
+
+    # 执行插入语句
+    insert into suppliers
+    (`sid`, `sname`, `city`, `telephone_no`)
+    values
+    (_sid, _sname, _city, _telephone_no);
+
+    # 返回成功
+    set st = 1;
+    set msg = "insert supplier success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_customer;
+
+delimiter //
+create procedure update_customer(
+    in _cid int,
+    in _cname varchar(15),
+    in _city varchar(15),
+    in _visits_made int,
+    in _last_visit_time datetime
+)
+update_customer:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 cid 相同的记录
+    select count(cid) from customers where cid=_cid limit 1 into res;
+    if res<1 then
+        set msg = "target customer not exists!";
+        select st, msg;
+        leave update_customer;
+    end if;
+
+    # 执行更新语句
+    update customers set 
+        cname = _cname,
+        city = _city,
+        visits_made = _visits_made,
+        last_visit_time = _last_visit_time
+    where cid=_cid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "update customer success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_employee;
+
+delimiter //
+create procedure update_employee(
+    in _eid int,
+    in _ename varchar(15),
+    in _city varchar(15)
+)
+update_employee:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 eid 相同的记录
+    select count(eid) from employees where eid=_eid limit 1 into res;
+    if res<1 then
+        set msg = "target employee not exists!";
+        select st, msg;
+        leave update_employee;
+    end if;
+
+    # 执行更新语句
+    update employees set
+        ename = _ename,
+        city = _city
+    where eid=_eid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "update employee success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_log;
+
+delimiter //
+create procedure update_log(
+    in _logid int,
+    in _who varchar(10),
+    in _time datetime,
+    in _table_name varchar(20),
+    in _operation varchar(6),
+    in _key_value int
+)
+update_log:
+begin
+    # 不支持直接修改
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail: logs not support update directly!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_product;
+
+delimiter //
+create procedure update_product(
+    in _pid int,
+    in _pname varchar(15),
+    in _qoh int,
+    in _qoh_threshold int,
+    in _original_price decimal(6,2),
+    in _discnt_rate decimal(3,2),
+    in _sid int
+)
+update_product:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在 pid 相同的记录
+    select count(pid) from products where pid=_pid limit 1 into res;
+    if res<1 then
+        set msg = "target product not exists!";
+        select st, msg;
+        leave update_product;
+    end if;
+
+    # 检查外键约束 没有对应的 supplier 则报错
+    select count(sid) from suppliers where sid=_sid limit 1 into res;
+    if res<1 then
+        set msg = "foreign key <sid> limit: record not exists in table <suppliers>!";
+        select st, msg;
+        leave update_product;
+    end if;
+
+    # 执行更新语句
+    update products set
+        pname = _pname,
+        qoh = _qoh,
+        qoh_threshold = _qoh_threshold,
+        original_price = _original_price,
+        discnt_rate = _discnt_rate,
+        sid = _sid
+    where pid=_pid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "update product success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_purchase;
+
+delimiter //
+create procedure update_purchase(
+    in _pur int,
+    in _cid int,
+    in _eid int,
+    in _pid int,
+    in _qty int,
+    in _ptime datetime,
+    in _total_price decimal(7,2)
+)
+update_purchase:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(64) default "query fail";
+
+    # 检查是否存在记录
+    select count(pur) from purchases where pur=_pur limit 1 into res;
+    if res<1 then
+        set msg = "target purchase not exists!";
+        select st, msg;
+        leave update_purchase;
+    end if;
+
+    # 验证 cid 是否存在
+    select count(cid) from customers where cid=_cid limit 1 into res;
+    if res<1 then
+        set msg = "foreign key <cid> limit: customer not found!";
+        select st, msg;
+        leave update_purchase;
+    end if;
+
+    # 验证 eid 是否存在
+    select count(eid) from employees where eid=_eid limit 1 into res;
+    if res<1 then
+        set msg = "foreign key <eid> limit: employee not found!";
+        select st, msg;
+        leave update_purchase;
+    end if;
+
+    # 验证 pid 是否存在
+    select count(pid) from products where pid=_pid limit 1 into res;
+    if res<1 then
+        set msg = "foreign key <pid> limit: product not found!";
+        select st, msg;
+        leave update_purchase;
+    end if;
+
+    # 执行更新
+    update purchases set
+        cid=_cid,
+        eid=_eid,
+        pid=_pid,
+        qty=_qty,
+        ptime=_ptime,
+        total_price=_total_price
+    where pur=_pur;
+
+    # 返回成功
+    set st = 1;
+    set msg = "update purchase success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists update_supplier;
+
+delimiter //
+create procedure update_supplier(
+    in _sid int,
+    in _sname varchar(15),
+    in _city varchar(15),
+    in _telephone_no char(10)
+)
+update_supplier:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 检查是否存在 sid 相同的记录
+    select count(sid) from suppliers where sid=_sid limit 1 into res;
+    if res<1 then
+        set msg = "target supplier not exists!";
+        select st, msg;
+        leave update_supplier;
+    end if;
+
+    # 检查是否存在 sname 相同的不同记录
+    select count(sid) from suppliers where sname=_sname and sid!=_sid limit 1 into res;
+    if res>0 then
+        set msg = "supplier name already exists!";
+        select st, msg;
+        leave update_supplier;
+    end if;
+
+    # 执行更新语句
+    update suppliers set
+        sname = _sname,
+        city = _city,
+        telephone_no = _telephone_no
+    where sid=_sid;
+
+    # 返回成功
+    set st = 1;
+    set msg = "update supplier success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists add_purchase;
+
+delimiter //
+create procedure add_purchase(
+    in c_id int,
+    in e_id int,
+    in p_id int,
+    in pur_qty int
+)
+add_purchase:
+begin
+    # 初始化返回结果
+    declare st, res int default 0;
+    declare msg varchar(32) default "query fail";
+
+    # 验证 cid 是否存在
+    select count(cid) from customers where cid=c_id limit 1 into res;
+    if res<1 then
+        set msg = "customer not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 eid 是否存在
+    select count(eid) from employees where eid=e_id limit 1 into res;
+    if res<1 then
+        set msg = "employee not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 pid 是否存在
+    select count(pid) from products where pid=p_id limit 1 into res;
+    if res<1 then
+        set msg = "product not found!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+
+    # 验证 pur_qty 是否超出 qoh
+    select qoh from products where pid=p_id into res;
+    if res<pur_qty then
+        set msg = "purchase quantity out of limit!";
+        select st, msg;
+        leave add_purchase;
+    end if;
+    
+    # 获取总价格
+    select original_price*discnt_rate from products where pid=p_id into res;
+    set res = res*pur_qty;
+
+    # 增加记录到 purchases 表
+    insert into purchases (cid, eid, pid, qty, ptime, total_price) values (c_id, e_id, p_id, pur_qty, now(), res);
+
+    # 返回成功
+    set st = 1;
+    set msg = "add purchase success!";
+    select st, msg;
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists report_monthly_sale;
+
+delimiter //
+create procedure report_monthly_sale(in p_id int)
+begin
+    select 
+        products.pname, 
+        SUBSTR(DATE_FORMAT(purchases.ptime, "%M"), 1, 3),
+        DATE_FORMAT(purchases.ptime, "%Y"),
+        SUM(qty),
+        SUM(total_price),
+        SUM(total_price)/SUM(qty)
+    from products, purchases
+    where products.pid=p_id and products.pid=purchases.pid
+    group by DATE_FORMAT(purchases.ptime, "%Y"), DATE_FORMAT(purchases.ptime, "%m");
+end//
+delimiter ;
+
+use lab3;
+drop procedure if exists show_customers;
+
+delimiter //
+create procedure show_customers()
+begin
+    select * from customers;
+end //
+delimiter ;
+use lab3;
+drop procedure if exists show_employees;
+
+delimiter //
+create procedure show_employees()
+begin
+    select * from employees;
+end //
+delimiter ;
+use lab3;
+drop procedure if exists show_logs;
+
+delimiter //
+create procedure show_logs()
+begin
+    select * from logs order by logid desc;
+end //
+delimiter ;
+use lab3;
+drop procedure if exists show_products;
+
+delimiter //
+create procedure show_products()
+begin
+    select * from products;
+end //
+delimiter ;
+use lab3;
+drop procedure if exists show_purchases;
+
+delimiter //
+create procedure show_purchases()
+begin
+    select * from purchases order by pur desc;
+end //
+delimiter ;
+use lab3;
+drop procedure if exists show_suppliers;
+
+delimiter //
+create procedure show_suppliers()
+begin
+    select * from suppliers;
+end //
+delimiter ;
+use lab3;
+drop trigger if exists triger_delete_customers;
+drop trigger if exists triger_delete_employees;
+drop trigger if exists triger_delete_products;
+drop trigger if exists triger_delete_purchases;
+drop trigger if exists triger_delete_suppliers;
+delimiter //
+
+# 为 customers 表注册 delete 触发器
+create trigger triger_delete_customers
+after delete on customers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "customers", "delete", OLD.cid);
+end//
+
+# 为 employees 表注册 delete 触发器
+create trigger triger_delete_employees
+after delete on employees for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "employees", "delete", OLD.eid);
+end//
+
+# 为 products 表注册 delete 触发器
+create trigger triger_delete_products
+after delete on products for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "products", "delete", OLD.pid);
+end//
+
+# 为 purchases 表注册 delete 触发器
+create trigger triger_delete_purchases
+after delete on purchases for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "purchases", "delete", OLD.pur);
+end//
+
+# 为 suppliers 表注册 delete 触发器
+create trigger triger_delete_suppliers
+after delete on suppliers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "suppliers", "delete", OLD.sid);
+end//
+
+delimiter ;
+use lab3;
+drop trigger if exists triger_insert_customers;
+drop trigger if exists triger_insert_employees;
+drop trigger if exists triger_insert_products;
+drop trigger if exists triger_insert_purchases;
+drop trigger if exists triger_insert_suppliers;
+delimiter //
+
+# 为 customers 表注册 insert 触发器
+create trigger triger_insert_customers
+after insert on customers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "customers", "insert", NEW.cid);
+end//
+
+# 为 employees 表注册 insert 触发器
+create trigger triger_insert_employees
+after insert on employees for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "employees", "insert", NEW.eid);
+end//
+
+# 为 products 表注册 insert 触发器
+create trigger triger_insert_products
+after insert on products for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "products", "insert", NEW.pid);
+end//
+
+# 为 purchases 表注册 insert 触发器
+# 注意这里我们实现业务逻辑，包括
+#   1.减少存货量 
+#   2.修改顾客信息
+#   3.补货
+create trigger triger_insert_purchases
+after insert on purchases for each row
+begin
+    declare res int default 0;
+
+    # 先插入记录进logs
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "purchases", "insert", NEW.pur);
+    
+    # 减少商品存量
+    update products set qoh=qoh-NEW.qty where pid=NEW.pid;
+
+    # 修改顾客信息
+    update customers set visits_made=visits_made+1, last_visit_time=now() where cid=NEW.cid;
+
+    # 补货
+    select count(*) from products
+    where pid=New.pid and qoh<qoh_threshold
+    into res;
+    if res>0 then
+        # 这里直接带 old_qoh = qoh+NEW.qty 进去算
+        update products set qoh=2*(qoh+NEW.qty) where pid=NEW.pid;
+    end if;
+end//
+
+# 为 suppliers 表注册 insert 触发器
+create trigger triger_insert_suppliers
+after insert on suppliers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "suppliers", "insert", NEW.sid);
+end//
+
+delimiter ;
+use lab3;
+drop trigger if exists triger_update_customers;
+drop trigger if exists triger_update_employees;
+drop trigger if exists triger_update_products;
+drop trigger if exists triger_update_purchases;
+drop trigger if exists triger_update_suppliers;
+delimiter //
+
+# 为 customers 表注册 update 触发器
+create trigger triger_update_customers
+after update on customers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "customers", "update", NEW.cid);
+end//
+
+# 为 employees 表注册 update 触发器
+create trigger triger_update_employees
+after update on employees for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "employees", "update", NEW.eid);
+end//
+
+# 为 products 表注册 update 触发器
+create trigger triger_update_products
+after update on products for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "products", "update", NEW.pid);
+end//
+
+# 为 purchases 表注册 update 触发器
+create trigger triger_update_purchases
+after update on purchases for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "purchases", "update", NEW.pur);
+end//
+
+# 为 suppliers 表注册 update 触发器
+create trigger triger_update_suppliers
+after update on suppliers for each row
+begin
+    insert into logs (`who`, `time`, `table_name`, `operation`, `key_value`)
+    values
+    (USER(), NOW(), "suppliers", "update", NEW.sid);
+end//
+
+delimiter ;
+
+
